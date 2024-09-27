@@ -2,20 +2,19 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useState, useRef } from 'react';
 import { Button, StyleSheet, Text, TouchableOpacity, View, Image, ScrollView } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 export default function Index() {
   const [facing, setFacing] = useState<CameraType>('back');
-  const [photos, setPhotos] = useState<string[]>([]); // Array to store multiple image URIs
+  const [photos, setPhotos] = useState<string[]>([]);
   const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef<any>(null); // Ref for the camera instance
+  const cameraRef = useRef<any>(null);
 
   if (!permission) {
-    // Camera permissions are still loading.
     return <View />;
   }
 
   if (!permission.granted) {
-    // Camera permissions are not granted yet.
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need your permission to show the camera</Text>
@@ -33,10 +32,23 @@ export default function Index() {
       try {
         // Capture the photo and get its URI
         const photo = await cameraRef.current.takePictureAsync();
-        setPhotos((prevPhotos) => [...prevPhotos, photo.uri]); // Add the new URI to the array
+        
+        // Determine the size for cropping
+        const { width, height } = photo;
+        const size = Math.min(width, height);
 
-        // Save the photo to the gallery
-        await MediaLibrary.createAssetAsync(photo.uri);
+        // Crop photo
+        const croppedPhoto = await ImageManipulator.manipulateAsync(
+          photo.uri,
+          [{ crop: { originX: (width - size) / 2, originY: (height - size) / 2, width: size, height: size } }],
+          { compress: 1, format: ImageManipulator.SaveFormat.PNG }
+        );
+
+        // Update state with the cropped photo URI
+        setPhotos((prevPhotos) => [...prevPhotos, croppedPhoto.uri]);
+
+        // Save the cropped photo
+        await MediaLibrary.createAssetAsync(croppedPhoto.uri);
       } catch (error) {
         console.error('Error taking photo:', error);
       }
@@ -49,7 +61,7 @@ export default function Index() {
         <CameraView 
           style={styles.camera} 
           facing={facing} 
-          ref={cameraRef}  // Attach the camera reference
+          ref={cameraRef}
         />
       </View>
       
@@ -84,7 +96,7 @@ const styles = StyleSheet.create({
     height: 300,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ccc', // Placeholder background color
+    backgroundColor: '#ccc',
     marginBottom: 20,
   },
   camera: {
@@ -114,7 +126,7 @@ const styles = StyleSheet.create({
   photo: {
     width: 100,
     height: 100,
-    marginRight: 10, // Space between images
+    marginRight: 10,
   },
   message: {
     textAlign: 'center',
